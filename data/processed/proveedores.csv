@@ -1,18 +1,34 @@
-id_proveedor,nombre,tipo,ciudad,reclamos_asociados,monto_promedio_reclamado,porcentaje_de_casos_observados,antigueedad_proveedor
-PROV-101,Talleres del Austro,Taller,Machala,14,7889.3,10.26,11
-PROV-102,Multiservicios Loja Car,Taller,Cuenca,38,3994.12,8.53,19
-PROV-103,Tecnicentro El Oro,Taller,Loja,7,4593.9,7.66,15
-PROV-104,Enderezada y Pintura Lojanita,Taller,Loja,34,5625.99,8.53,10
-PROV-105,Autoservicio Cuenca,Taller,Machala,21,5098.98,11.53,2
-PROV-106,Clínica Hospital Municipal Loja,Clínica,Loja,47,4240.15,11.79,14
-PROV-107,Hospital Santa Inés Cuenca,Clínica,Loja,10,3913.76,10.57,12
-PROV-108,Clínica La Cigüeña Machala,Clínica,Azogues,34,6301.48,6.75,10
-PROV-109,Clínica San Agustín,Clínica,Machala,16,2477.48,1.17,10
-PROV-110,Ing. Carlos Mendoza (Perito),Perito,Loja,32,4740.63,0.09,5
-PROV-111,Dr. Luis Silva (Perito),Perito,Loja,15,5590.61,6.9,14
-PROV-112,Ing. Juan Castro (Perito),Perito,Azogues,36,3119.6,12.2,13
-PROV-113,Dra. María Cabrera (Perito),Perito,Zamora,24,1613.45,2.03,8
-PROV-114,Taller El Chueco,Lista Restrictiva,Loja,6,5872.23,66.59,2
-PROV-115,Taller XYZ,Lista Restrictiva,Cuenca,35,5540.36,82.74,15
-PROV-116,Clínica Trucha,Lista Restrictiva,Azogues,17,1602.65,86.94,6
-PROV-117,Perito Sospechoso,Lista Restrictiva,Zamora,32,1152.72,65.81,6
+ID Proveedor;Nombre Proveedor;Tipo;Ciudad;N° Siniestros Asociados;En Lista Restrictiva;Motivo Restricción;Promedio Monto ($);
+HOSP-001;Clínica Santa Cecilia;Salud;Ambato;8;No;No;—;10873
+HOSP-002;Hospital Metropolitano Quito;Salud;Quito;3;No;No;—;8217
+HOSP-003;Clínica Ibarra Salud;Salud;Ibarra;5;No;No;—;16841
+HOSP-004;Hospital Básico Guayaquil;Salud;Loja;5;No;No;—;11430
+HOSP-005;Centro Médico del Sur;Salud;Quito;8;No;No;—;7784
+PROV-014;Servicios Hogar Ecuador;Servicios;Quito;10;No;No;—;22930
+PROV-015;Reparaciones Domésticas EC;Servicios;Ambato;12;No;No;—;22999
+PROV-016;Técnicos del Hogar Cía.;Servicios;Cuenca;16;No;No;—;13836
+PROV-017;Servicios Integrales Sur;Servicios;Loja;10;No;No;—;14011
+PROV-018;Hogar Seguro S.A.;Servicios;Ambato;17;No;No;—;15929
+PROV-019;Reparaciones Norte Ecuador;Servicios;Esmeraldas;10;No;No;—;19684
+PROV-020;Servicios Generales GYE;Servicios;Esmeraldas;17;No;No;—;14994
+PROV-021;Reparaciones Tungurahua;Servicios;Cuenca;17;No;No;—;18293
+PROV-022;Técnicos Especializados EC;Servicios;Guayaquil;12;No;No;—;17842
+TALLER-001;Taller El Norte Cía. Ltda.;Automotriz;Ambato;11;No;No;—;7941
+TALLER-002;Automotriz Centro Sur;Automotriz;Cuenca;23;No;No;—;9533
+TALLER-003;Mecánica Imbabura S.A.;Automotriz;Manta;26;No;No;—;7602
+TALLER-004;Servicio Express Loja;Automotriz;Ibarra;24;No;No;—;7831
+TALLER-005;Taller Portuario Guayaquil;Automotriz;Portoviejo;21;No;No;—;7176
+TALLER-006;Auto Service Quito Norte;Automotriz;Guayaquil;15;No;No;—;7573
+TALLER-007;Multiservicios Automotrices EC;Automotriz;Ambato;17;No;No;—;9404
+TALLER-008;Reparaciones Viales Cía.;Automotriz;Manta;21;No;No;—;6989
+TALLER-011;Mecánica Tungurahua;Automotriz;Quito;16;No;No;—;7445
+TALLER-012;Serviautos Litoral;Automotriz;Riobamba;23;No;No;—;8235
+TALLER-013;Taller Chimborazo Express;Automotriz;Loja;25;No;No;—;6941
+TALLER-015;Automotriz Sur Azuay;Automotriz;Manta;18;No;No;—;8184
+TALLER-016;Servicio Técnico Loja;Automotriz;Ibarra;20;No;No;—;8788
+TALLER-017;Mecánica Manabí;Automotriz;Ibarra;19;No;No;—;6810
+TALLER-018;Automotriz Ambato Central;Automotriz;Ibarra;15;No;No;—;5988
+TALLER-020;Taller Quito Sur Cía.;Automotriz;Guayaquil;24;No;No;—;6732
+TALLER-777;Mecánica Sin Nombre — Facturación irregular;Automotriz;Ambato;10;Sí;Sí;Facturas irregulares / vinculado a reclamos inflados;13400
+TALLER-888;Taller Anónimo Manta — Documentos alterados;Automotriz;Ambato;10;Sí;Sí;Documentos alterados / fraude comprobado;13442
+TALLER-999;Taller No Registrado — Asociado a red de fraude;Automotriz;Portoviejo;12;Sí;Sí;Asociado a red de fraude vehicular — 3 siniestros vinculados;10997

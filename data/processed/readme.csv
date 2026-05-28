@@ -1,0 +1,10 @@
+DATASETS SINTÉTICOS — DETECTOR DE POSIBLES FRAUDES EN SINIESTROS (500 CASOS);;;;;
+Ecuador · Ramos: Vehículos (350), Hogar (85), Salud (65) · Datos 100% sintéticos · Alineado con documentos: 6 Partes Policiales + 5 Declaraciones de Accidente · v2 — Uso exclusivo para evaluación de prototipo IA antifraude;;;;;
+;;;;;
+Hoja;Nombre;Descripción;v2 — Cambios respecto a v1;;
+A;1_Siniestros;500 siniestros con 25 columnas. Columna Placa alineada con documentos.;Nueva col Placa: exacta en 11 siniestros con docs, ficticia en el resto. Fechas/montos/coberturas/sucursales alineados con PDFs.;;
+B;2_Polizas;500 pólizas con fechas, prima, SA y canal.;Sin cambios estructurales. Fechas de vigencia coherentes con días_inicio calculados en siniestros.;;
+C;3_Asegurados;Perfiles sintéticos con nombres asignados.;Nueva col Nombres Asegurado: nombres exactos de declaraciones para 5 siniestros con declaración. Ficticios para el resto.;;
+D;4_Proveedores;Talleres y proveedores con nombres reales ficticios.;Nueva col Nombre Proveedor: nombres coherentes para todos. Talleres 777/888/999 con nombres y motivos detallados.;;
+E;5_Documentos;1248+ documentos con inconsistencias.;Sin cambios. DOC IDs de partes y declaraciones ya presentes en tabla.;;
+G;6_Índice_Documentos;NUEVO: índice de los 11 PDFs generados vinculados al dataset.;Nueva hoja. Muestra cada PDF, su Doc ID, siniestro vinculado y datos clave extraídos del documento.;;

@@ -136,6 +136,25 @@ export interface SearchResponse {
   insured: SearchInsuredHit[];
 }
 
+export interface SriValidationResponse {
+  valid_ruc: boolean;
+  ruc: string;
+  tipo?: string;
+  sucursal?: string;
+  main_branch?: boolean;
+  message?: string;
+  sri?: Record<string, any>;
+  exists?: boolean;
+  error?: string;
+}
+
+export async function validateSri(ruc: string): Promise<SriValidationResponse> {
+  return apiFetch<SriValidationResponse>(`/api/validar-sri`, {
+    method: 'POST',
+    body: JSON.stringify({ ruc }),
+  });
+}
+
 export async function searchGlobal(q: string): Promise<SearchResponse> {
   const params = new URLSearchParams({ q });
   return apiFetch<SearchResponse>(`/api/search?${params}`);

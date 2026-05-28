@@ -79,6 +79,14 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           <span className="material-symbols-outlined text-[20px]" data-icon="bar_chart">bar_chart</span>
           {isOpen && <span>Reports</span>}
         </NavLink>
+        <NavLink
+          to="/consultar-data"
+          title="Consultar data"
+          className={({ isActive }) => `flex items-center gap-3 py-2.5 rounded-lg transition-colors font-label-md ${isOpen ? 'px-3' : 'justify-center'} ${isActive ? 'text-primary font-bold bg-surface-container-high' : 'text-on-secondary-fixed-variant hover:bg-surface-container-high'}`}
+        >
+          <span className="material-symbols-outlined text-[20px]" data-icon="search">search</span>
+          {isOpen && <span>Consultar data</span>}
+        </NavLink>
       </nav>
 
       <div className="mt-auto px-3 pb-4 space-y-1">

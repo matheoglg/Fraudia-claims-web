@@ -7,6 +7,7 @@ import AlertsPanel from './components/AlertsPanel';
 import ClaimAnalyzer from './components/ClaimAnalyzer';
 import AgentView from './components/AgentView';
 import NetworkView from './components/NetworkView';
+import ConsultarData from './components/ConsultarData';
 
 import EntitiesView from './components/EntitiesView';
 import ReportsView from './components/ReportsView';
@@ -30,6 +31,7 @@ function App() {
           } />
           <Route path="/analyzer" element={<ClaimAnalyzer />} />
           <Route path="/agent" element={<AgentView />} />
+          <Route path="/consultar-data" element={<ConsultarData />} />
           <Route path="/network" element={<NetworkView />} />
           <Route path="/entities" element={<EntitiesView />} />
           <Route path="/reports" element={<ReportsView />} />

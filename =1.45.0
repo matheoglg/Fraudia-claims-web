@@ -1,0 +1,4 @@
+Requirement already satisfied: playwright in ./venv/lib/python3.12/site-packages (1.60.0)
+Requirement already satisfied: pyee<14,>=13 in ./venv/lib/python3.12/site-packages (from playwright) (13.0.1)
+Requirement already satisfied: greenlet<4.0.0,>=3.1.1 in ./venv/lib/python3.12/site-packages (from playwright) (3.5.1)
+Requirement already satisfied: typing-extensions in ./venv/lib/python3.12/site-packages (from pyee<14,>=13->playwright) (4.15.0)
