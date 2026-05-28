@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FileText, TriangleAlert, PiggyBank, Download, Filter, RefreshCw, Sparkles, CheckSquare, Settings2, Trash2, WifiOff } from 'lucide-react';
 import { useClaims } from '../hooks/useClaims';
-import type { Claim } from '../services/api';
+import { createManualClaim, type Claim } from '../services/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -40,6 +40,10 @@ function formatDate(s: string | undefined): string {
   }
 }
 
+function norm(s: unknown): string {
+  return String(s ?? '').trim().toLowerCase();
+}
+
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 function SkeletonRow() {
   return (
@@ -56,20 +60,51 @@ function SkeletonRow() {
 // ── Dashboard / Claims View ───────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const q = (params.get('q') || '').trim();
 
-  // Load a larger set of claims to allow local filtering/sorting for the demo
-  const { claims: allClaims, total, loading, error, refetch } = useClaims({ page: 1, limit: 100 });
+  // Load full dataset (1000 siniestros) for consistent analysis across the app
+  const { claims: allClaims, total, loading, error, refetch } = useClaims({ page: 1, limit: 1000 });
 
   const [activeTab, setActiveTab] = useState<'all' | 'review' | 'docs'>('all');
   const [priorityMode, setPriorityMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterColors, setFilterColors] = useState<{ rojo: boolean; amarillo: boolean; verde: boolean }>({
+    rojo: true,
+    amarillo: true,
+    verde: true,
+  });
+  const [filterSucursal, setFilterSucursal] = useState<string>('Todas');
+  const [filterRamo, setFilterRamo] = useState<string>('Todos');
+  const [filterMissingDocs, setFilterMissingDocs] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [manual, setManual] = useState({
+    id_siniestro: '',
+    id_poliza: '',
+    id_asegurado: '',
+    ramo: '',
+    cobertura: '',
+    fecha_ocurrencia: '',
+    fecha_reporte: '',
+    monto_reclamado: '',
+    sucursal: '',
+    descripcion: '',
+    beneficiario: '',
+    documentos_completos: 'Sí',
+    id_proveedor: '',
+    placa_vehiculo: '',
+  });
 
   // Red claims (for KPI card)
   const { total: totalRojo } = useClaims({ page: 1, limit: 1, color: 'rojo' });
-  const { claims: redClaims } = useClaims({ page: 1, limit: 100, color: 'rojo' });
+  const { claims: redClaims } = useClaims({ page: 1, limit: 1000, color: 'rojo' });
   const potentialSavings = redClaims.reduce((acc, c) => acc + (c.monto_reclamado ?? 0), 0);
+  const missingDocsCount = allClaims.filter((c) => c.documentos_completos === 'No' || c.documentos_completos === 'Incompleto').length;
 
   // 1. Filter claims
   const filteredClaims = useMemo(() => {
@@ -84,8 +119,58 @@ export default function Dashboard() {
       result = result.filter(c => c.documentos_completos === 'No' || c.documentos_completos === 'Incompleto');
     }
 
+    // Advanced filters (Settings)
+    result = result.filter((c) => {
+      const color = c.final_color || 'verde';
+      if (color === 'rojo' && !filterColors.rojo) return false;
+      if (color === 'amarillo' && !filterColors.amarillo) return false;
+      if (color === 'verde' && !filterColors.verde) return false;
+
+      if (filterSucursal !== 'Todas' && norm(c.sucursal) !== norm(filterSucursal)) return false;
+      if (filterRamo !== 'Todos' && norm(c.ramo) !== norm(filterRamo)) return false;
+
+      if (filterMissingDocs) {
+        const miss = c.documentos_completos === 'No' || c.documentos_completos === 'Incompleto';
+        if (!miss) return false;
+      }
+      return true;
+    });
+
+    // Global query filter (TopBar search)
+    if (q) {
+      const needle = q.toLowerCase();
+      result = result.filter((c) => {
+        const id = String(c.id_siniestro ?? '');
+        const pol = String(c.id_poliza ?? '');
+        const aseg = String(c.id_asegurado ?? '');
+        const blob = [
+          id,
+          pol,
+          aseg,
+          c.beneficiario ?? '',
+          c.ramo ?? '',
+          c.cobertura ?? '',
+          c.sucursal ?? '',
+          c.descripcion ?? '',
+        ]
+          .join(' ')
+          .toLowerCase();
+        return id.includes(needle) || pol.toLowerCase().includes(needle) || blob.includes(needle);
+      });
+    }
+
     return result;
-  }, [allClaims, activeTab]);
+  }, [
+    allClaims,
+    activeTab,
+    filterColors.rojo,
+    filterColors.amarillo,
+    filterColors.verde,
+    filterSucursal,
+    filterRamo,
+    filterMissingDocs,
+    q,
+  ]);
 
   // 2. Sort claims (Priority Mode)
   const sortedClaims = useMemo(() => {
@@ -206,14 +291,151 @@ export default function Dashboard() {
           <h2 className="text-display font-display font-bold text-on-surface mb-2">Gestión de Siniestros</h2>
           <p className="text-body-lg text-on-surface-variant">Centro de triaje y priorización de reclamos.</p>
         </div>
-        <button
-          onClick={refetch}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-colors text-label-md bg-surface-container-lowest"
-        >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          Sincronizar
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setManualError(null);
+              setManualOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary hover:opacity-90 transition-opacity text-label-md font-bold"
+          >
+            + Nuevo siniestro
+          </button>
+          <button
+            onClick={refetch}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-colors text-label-md bg-surface-container-lowest"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            Sincronizar
+          </button>
+        </div>
       </div>
+
+      {/* Manual claim modal */}
+      {manualOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setManualOpen(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+            <div className="w-full max-w-3xl max-h-[90vh] bg-surface border border-outline-variant rounded-2xl shadow-2xl overflow-y-auto">
+              <div className="p-5 border-b border-outline-variant flex items-center justify-between">
+                <div>
+                  <h3 className="text-headline-sm font-bold text-on-surface">Cargar siniestro manual</h3>
+                  <p className="text-label-sm text-on-surface-variant">Se guardará en la base relacional para auditoría.</p>
+                </div>
+                <button
+                  className="px-3 py-2 rounded-lg hover:bg-surface-container-low text-on-surface-variant font-bold"
+                  onClick={() => setManualOpen(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="ID Siniestro" value={manual.id_siniestro} onChange={(v) => setManual((p) => ({ ...p, id_siniestro: v }))} placeholder="1001" />
+                <Field label="ID Póliza" value={manual.id_poliza} onChange={(v) => setManual((p) => ({ ...p, id_poliza: v }))} placeholder="POL-XXXXXX" />
+                <Field label="ID Asegurado" value={manual.id_asegurado} onChange={(v) => setManual((p) => ({ ...p, id_asegurado: v }))} placeholder="ASEG-XXXXXX" />
+                <Field label="Sucursal" value={manual.sucursal} onChange={(v) => setManual((p) => ({ ...p, sucursal: v }))} placeholder="Loja" />
+                <Field label="Ramo" value={manual.ramo} onChange={(v) => setManual((p) => ({ ...p, ramo: v }))} placeholder="Vehículos" />
+                <Field label="Cobertura" value={manual.cobertura} onChange={(v) => setManual((p) => ({ ...p, cobertura: v }))} placeholder="Choque / Robo / ..." />
+                <Field label="Fecha ocurrencia" type="date" value={manual.fecha_ocurrencia} onChange={(v) => setManual((p) => ({ ...p, fecha_ocurrencia: v }))} />
+                <Field label="Fecha reporte" type="date" value={manual.fecha_reporte} onChange={(v) => setManual((p) => ({ ...p, fecha_reporte: v }))} />
+                <Field label="Monto reclamado (USD)" value={manual.monto_reclamado} onChange={(v) => setManual((p) => ({ ...p, monto_reclamado: v }))} placeholder="1500.00" />
+                <Field label="Beneficiario / Proveedor" value={manual.beneficiario} onChange={(v) => setManual((p) => ({ ...p, beneficiario: v }))} placeholder="Clínica / Taller / Perito..." />
+                <Field label="ID Proveedor (opcional)" value={manual.id_proveedor} onChange={(v) => setManual((p) => ({ ...p, id_proveedor: v }))} placeholder="PROV-123" />
+                <Field label="Placa vehículo (opcional)" value={manual.placa_vehiculo} onChange={(v) => setManual((p) => ({ ...p, placa_vehiculo: v }))} placeholder="ABC-1234" />
+
+                <div className="md:col-span-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">Descripción</div>
+                  <textarea
+                    className="w-full min-h-[110px] px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant outline-none focus:border-primary"
+                    value={manual.descripcion}
+                    onChange={(e) => setManual((p) => ({ ...p, descripcion: e.target.value }))}
+                    placeholder="Narrativa del siniestro…"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">Documentos completos</div>
+                  <select
+                    className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant outline-none focus:border-primary"
+                    value={manual.documentos_completos}
+                    onChange={(e) => setManual((p) => ({ ...p, documentos_completos: e.target.value }))}
+                  >
+                    <option value="Sí">Sí</option>
+                    <option value="No">No</option>
+                    <option value="Incompleto">Incompleto</option>
+                  </select>
+                </div>
+
+                {manualError && (
+                  <div className="md:col-span-2 bg-error-container text-error rounded-xl p-3 border border-error/20 font-bold text-label-sm">
+                    {manualError}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-5 border-t border-outline-variant flex items-center justify-end gap-3">
+                <button
+                  className="px-4 py-2 rounded-lg border border-outline-variant bg-surface hover:bg-surface-container-low font-bold"
+                  onClick={() => setManualOpen(false)}
+                  disabled={manualSaving}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-lg bg-primary text-on-primary font-bold hover:opacity-90 ${manualSaving ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  onClick={async () => {
+                    setManualError(null);
+                    // front validations
+                    const monto = Number(manual.monto_reclamado);
+                    if (!manual.id_siniestro.trim() || !manual.id_poliza.trim() || !manual.id_asegurado.trim()) {
+                      setManualError('ID siniestro, póliza y asegurado son obligatorios.');
+                      return;
+                    }
+                    if (!manual.ramo.trim() || !manual.cobertura.trim() || !manual.sucursal.trim()) {
+                      setManualError('Ramo, cobertura y sucursal son obligatorios.');
+                      return;
+                    }
+                    if (!manual.fecha_ocurrencia || !manual.fecha_reporte) {
+                      setManualError('Fechas de ocurrencia y reporte son obligatorias.');
+                      return;
+                    }
+                    if (!Number.isFinite(monto) || monto <= 0) {
+                      setManualError('Monto reclamado debe ser un número mayor a 0.');
+                      return;
+                    }
+                    if (!manual.descripcion.trim() || !manual.beneficiario.trim()) {
+                      setManualError('Descripción y beneficiario son obligatorios.');
+                      return;
+                    }
+
+                    setManualSaving(true);
+                    try {
+                      await createManualClaim({
+                        ...manual,
+                        monto_reclamado: monto,
+                        monto_estimado: monto,
+                        monto_pagado: 0,
+                        estado: 'Reserva',
+                        etiqueta_fraude_simulada: 0,
+                      });
+                      setManualOpen(false);
+                      refetch();
+                    } catch (e: any) {
+                      setManualError(e.message || 'Error al guardar el siniestro.');
+                    } finally {
+                      setManualSaving(false);
+                    }
+                  }}
+                  disabled={manualSaving}
+                >
+                  {manualSaving ? 'Guardando…' : 'Guardar siniestro'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {error && (
         <div className="bg-error-container text-error rounded-xl p-4 mb-6 flex items-center gap-3">
@@ -259,16 +481,16 @@ export default function Dashboard() {
           <div className="text-label-md text-on-surface-variant">En siniestros rojos activos</div>
         </div>
 
-        {/* Precisión IA */}
+        {/* Docs incompletos (dato real) */}
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 hover:bg-surface-container-low transition-colors duration-200">
           <div className="flex justify-between items-start mb-4">
-            <h3 className="text-label-sm text-on-surface-variant uppercase font-bold tracking-wider w-20">PRECISIÓN IA</h3>
+            <h3 className="text-label-sm text-on-surface-variant uppercase font-bold tracking-wider w-28">DOCS INCOMPLETOS</h3>
             <span className="material-symbols-outlined text-on-surface-variant">psychiatry</span>
           </div>
-          <div className="text-display font-display font-bold text-on-surface mb-2">94.8%</div>
-          <div className="text-label-md font-bold text-green-600 flex items-center gap-1">
-            <span className="material-symbols-outlined text-[16px]">check_circle</span>
-            Modelo v4.2 Activo
+          <div className="text-display font-display font-bold text-on-surface mb-2">{missingDocsCount}</div>
+          <div className="text-label-md font-bold text-on-surface-variant flex items-center gap-1">
+            <span className="material-symbols-outlined text-[16px]">folder_open</span>
+            En los 100 casos cargados
           </div>
         </div>
       </div>
@@ -339,11 +561,124 @@ export default function Dashboard() {
               {isExportingNotion ? 'Enviando...' : 'Exportar a Notion'}
             </button>
 
-            <button className="p-2 text-on-surface-variant hover:bg-surface-container-high rounded transition-colors" title="Filtros avanzados">
+            <button
+              className={`p-2 text-on-surface-variant hover:bg-surface-container-high rounded transition-colors ${filtersOpen ? 'bg-surface-container-high' : ''}`}
+              title="Filtros avanzados"
+              onClick={() => setFiltersOpen((v) => !v)}
+            >
               <Settings2 size={20} />
             </button>
           </div>
         </div>
+
+        {/* Advanced Filters Panel (Settings button) */}
+        {filtersOpen && (
+          <div className="border-b border-outline-variant bg-surface-container-lowest px-4 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1">
+                <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/40">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                    Riesgo
+                  </div>
+                  <div className="space-y-2">
+                    {(['rojo', 'amarillo', 'verde'] as const).map((c) => (
+                      <label key={c} className="flex items-center gap-2 text-label-sm text-on-surface cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={filterColors[c]}
+                          onChange={(e) => setFilterColors((p) => ({ ...p, [c]: e.target.checked }))}
+                        />
+                        <span className="capitalize font-bold">{c}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/40">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                    Sucursal
+                  </div>
+                  <select
+                    value={filterSucursal}
+                    onChange={(e) => setFilterSucursal(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-surface border border-outline-variant text-body-sm"
+                  >
+                    {['Todas', ...Array.from(new Set(allClaims.map((c) => String(c.sucursal ?? '').trim()).filter(Boolean)))].map((s) => (
+                      <option key={s as string} value={s as string}>
+                        {s as string}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/40">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                    Ramo
+                  </div>
+                  <select
+                    value={filterRamo}
+                    onChange={(e) => setFilterRamo(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-surface border border-outline-variant text-body-sm"
+                  >
+                    {['Todos', ...Array.from(new Set(allClaims.map((c) => String(c.ramo ?? '').trim()).filter(Boolean)))].map((r) => (
+                      <option key={r as string} value={r as string}>
+                        {r as string}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/40">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                    Documentos
+                  </div>
+                  <label className="flex items-center gap-2 text-label-sm text-on-surface cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filterMissingDocs}
+                      onChange={(e) => setFilterMissingDocs(e.target.checked)}
+                    />
+                    Solo incompletos
+                  </label>
+                  {q && (
+                    <div className="mt-2 text-[11px] text-on-surface-variant">
+                      Búsqueda activa: <span className="font-bold text-on-surface">{q}</span>{' '}
+                      <button
+                        className="text-primary font-bold hover:underline ml-1"
+                        onClick={() => {
+                          params.delete('q');
+                          setParams(params, { replace: true });
+                        }}
+                      >
+                        limpiar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="shrink-0 flex flex-col gap-2">
+                <button
+                  className="px-4 py-2 rounded-lg border border-outline-variant bg-surface hover:bg-surface-container-low text-label-md font-bold"
+                  onClick={() => setFiltersOpen(false)}
+                >
+                  Cerrar
+                </button>
+                <button
+                  className="px-4 py-2 rounded-lg bg-primary text-on-primary text-label-md font-bold hover:opacity-90"
+                  onClick={() => {
+                    setFilterColors({ rojo: true, amarillo: true, verde: true });
+                    setFilterSucursal('Todas');
+                    setFilterRamo('Todos');
+                    setFilterMissingDocs(false);
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mass Actions Banner (Visible when items selected) */}
         {selectedIds.size > 0 && (
@@ -493,6 +828,33 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <div>
+      <div className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">{label}</div>
+      <input
+        type={type}
+        className="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant outline-none focus:border-primary"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
     </div>
   );
 }

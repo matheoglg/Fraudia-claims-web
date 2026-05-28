@@ -27,6 +27,7 @@ from src.api.network import network_bp
 from src.api.entities import entities_bp
 from src.api.reports import reports_bp
 from src.api.notion import notion_bp
+from src.api.search import search_bp
 
 def create_app() -> Flask:
     """Application factory."""
@@ -43,6 +44,7 @@ def create_app() -> Flask:
     app.register_blueprint(entities_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(notion_bp)
+    app.register_blueprint(search_bp)
 
     return app
 

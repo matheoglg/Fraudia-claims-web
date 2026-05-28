@@ -1,22 +1,14 @@
-import pandas as pd 
-import sqlite3
+import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-RAW_CSV = PROJECT_ROOT / "data" / "raw" / "insurance_claims.csv"
-PROCESSED_CSV = PROJECT_ROOT / "data" / "processed" / "siniestros_processed.csv"
-DB_PATH = PROJECT_ROOT / "fraudia.db"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.storage.relational_db import DEFAULT_DB_PATH, ensure_relational_db  # noqa: E402
+
 def main() -> None:
-    conn = sqlite3.connect(DB_PATH)
-    # Raw table
-    print("Cargando raw_siniestros …")
-    raw_df = pd.read_csv(RAW_CSV)
-    raw_df.to_sql("raw_siniestros", conn, if_exists="replace", index=False)
-    # Processed table
-    print("Cargando processed_siniestros …")
-    proc_df = pd.read_csv(PROCESSED_CSV)
-    proc_df.to_sql("processed_siniestros", conn, if_exists="replace", index=False)
-    conn.close()
-    print(f"Base SQLite creada en {DB_PATH}")
+    db_path = ensure_relational_db(DEFAULT_DB_PATH)
+    print(f"Base SQLite creada/actualizada en {db_path}")
 if __name__ == "__main__":
     main()

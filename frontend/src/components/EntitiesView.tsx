@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getProviderRisk, type ProviderRisk } from '../services/api';
 import { Users, AlertTriangle, Building2, Stethoscope, Search, ShieldAlert, ArrowRight } from 'lucide-react';
 
 export default function EntitiesView() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [providers, setProviders] = useState<ProviderRisk[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    const q = (params.get('q') || '').trim();
+    if (q) setSearchTerm(q);
+  }, [params]);
 
   useEffect(() => {
     getProviderRisk()
@@ -137,7 +145,11 @@ export default function EntitiesView() {
                     </span>
                   )}
                 </div>
-                <button className="w-full py-2.5 bg-surface border border-outline-variant rounded-lg font-label-md font-bold text-on-surface hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2 group-hover:border-primary group-hover:text-primary">
+                <button
+                  className="w-full py-2.5 bg-surface border border-outline-variant rounded-lg font-label-md font-bold text-on-surface hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2 group-hover:border-primary group-hover:text-primary"
+                  onClick={() => navigate(`/network?focus=${encodeURIComponent(`provider_${provider.id_proveedor}`)}`)}
+                  title="Ir a este nodo en la Red"
+                >
                   Ver en Red de Relaciones
                   <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
                 </button>

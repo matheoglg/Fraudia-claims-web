@@ -11,6 +11,10 @@ Provides REST endpoints to:
 import sys
 from pathlib import Path
 # pyrefly: ignore [missing-import]
+import sqlite3
+# pyrefly: ignore [missing-import]
+import pandas as pd
+# pyrefly: ignore [missing-import]
 from flask import Blueprint, jsonify, request
 
 # Ensure the backend root is on sys.path so relative imports work
@@ -27,6 +31,7 @@ from src.ingestion.load_data import (
 )
 from src.rules.fraud_rules import evaluate_record
 from src.explainability.explain_score import combine_scores, generate_explanation
+from src.storage.relational_db import DEFAULT_DB_PATH, ensure_relational_db
 
 claims_bp = Blueprint("claims", __name__, url_prefix="/api/claims")
 
@@ -34,10 +39,89 @@ claims_bp = Blueprint("claims", __name__, url_prefix="/api/claims")
 # ── Helper: load the processed dataset once per request context ──────────
 def _load_claims_df():
     """Load the processed siniestros DataFrame."""
+    # Prefer relational DB view when available (keeps dashboard/entities/reports/network consistent)
+    try:
+        ensure_relational_db(DEFAULT_DB_PATH)
+        conn = sqlite3.connect(DEFAULT_DB_PATH)
+        try:
+            df_rel = pd.read_sql_query("SELECT * FROM claims_enriched", conn)
+        finally:
+            conn.close()
+        if not df_rel.empty:
+            return df_rel
+    except Exception:
+        pass
     try:
         return load_siniestros(processed=True)
     except FileNotFoundError:
         return load_siniestros(processed=False)
+
+
+@claims_bp.route("/manual", methods=["POST"])
+def create_manual_claim():
+    """
+    Insert a new claim manually into the relational DB.
+
+    Body: JSON with at least:
+      id_siniestro, id_poliza, id_asegurado, ramo, cobertura,
+      fecha_ocurrencia, fecha_reporte, monto_reclamado, sucursal,
+      descripcion, beneficiario, documentos_completos
+    """
+    body = request.get_json(silent=True) or {}
+    required = [
+        "id_siniestro",
+        "id_poliza",
+        "id_asegurado",
+        "ramo",
+        "cobertura",
+        "fecha_ocurrencia",
+        "fecha_reporte",
+        "monto_reclamado",
+        "sucursal",
+        "descripcion",
+        "beneficiario",
+        "documentos_completos",
+    ]
+    missing = [k for k in required if not str(body.get(k, "")).strip()]
+    if missing:
+        return jsonify({"error": f"Campos requeridos faltantes: {', '.join(missing)}"}), 400
+
+    # Basic validations
+    try:
+        monto = float(body.get("monto_reclamado"))
+        if monto <= 0:
+            return jsonify({"error": "monto_reclamado debe ser mayor a 0"}), 400
+    except Exception:
+        return jsonify({"error": "monto_reclamado inválido"}), 400
+
+    ensure_relational_db(DEFAULT_DB_PATH)
+    conn = sqlite3.connect(DEFAULT_DB_PATH)
+    try:
+        conn.row_factory = sqlite3.Row
+        sid = str(body.get("id_siniestro")).strip()
+        # ensure uniqueness
+        cur = conn.execute("SELECT 1 FROM siniestros WHERE id_siniestro = ?", (sid,))
+        if cur.fetchone() is not None:
+            return jsonify({"error": f"Ya existe un siniestro con id_siniestro={sid}"}), 400
+
+        # Insert using current table columns (ignore unknown keys)
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(siniestros)").fetchall()]
+        row = {c: body.get(c) for c in cols if c in body}
+
+        # Fill optional defaults
+        row.setdefault("monto_estimado", row.get("monto_reclamado"))
+        row.setdefault("monto_pagado", 0)
+        row.setdefault("estado", "Reserva")
+        row.setdefault("etiqueta_fraude_simulada", 0)
+
+        keys = list(row.keys())
+        placeholders = ",".join(["?"] * len(keys))
+        sql = f"INSERT INTO siniestros ({','.join(keys)}) VALUES ({placeholders})"
+        conn.execute(sql, tuple(row[k] for k in keys))
+        conn.commit()
+        return jsonify({"success": True, "id_siniestro": sid})
+    finally:
+        conn.close()
 
 
 # ── GET /api/claims ──────────────────────────────────────────────────────

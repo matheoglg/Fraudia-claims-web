@@ -76,6 +76,71 @@ export interface ChatResponse {
   answer: string;
 }
 
+export async function exportAgentPdf(payload: {
+  title?: string;
+  messages: { role: 'user' | 'agent'; text: string }[];
+}): Promise<Blob> {
+  const url = `${API_BASE}/api/agent/export_pdf`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(errorBody.error ?? `HTTP ${res.status}`);
+  }
+  return res.blob();
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+
+export interface SearchClaimHit {
+  id_siniestro: string;
+  id_poliza: string;
+  id_asegurado: string;
+  ramo?: string;
+  cobertura?: string;
+  fecha_ocurrencia?: string;
+  monto_reclamado?: number;
+  beneficiario?: string;
+  asegurado_nombre?: string;
+  proveedor_nombre?: string;
+}
+
+export interface SearchPolicyHit {
+  id_poliza: string;
+  id_asegurado: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  suma_asegurada?: number;
+}
+
+export interface SearchProviderHit {
+  id_proveedor: string;
+  nombre: string;
+  tipo_proveedor?: string;
+}
+
+export interface SearchInsuredHit {
+  id_asegurado: string;
+  cedula?: string;
+  nombre?: string;
+}
+
+export interface SearchResponse {
+  query: string;
+  claims: SearchClaimHit[];
+  policies: SearchPolicyHit[];
+  providers: SearchProviderHit[];
+  insured: SearchInsuredHit[];
+}
+
+export async function searchGlobal(q: string): Promise<SearchResponse> {
+  const params = new URLSearchParams({ q });
+  return apiFetch<SearchResponse>(`/api/search?${params}`);
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(
@@ -119,6 +184,13 @@ export async function fetchClaims(
  */
 export async function fetchClaim(id: number | string): Promise<Claim> {
   return apiFetch<Claim>(`/api/claims/${id}`);
+}
+
+export async function createManualClaim(payload: Record<string, any>): Promise<{ success: boolean; id_siniestro: string }> {
+  return apiFetch<{ success: boolean; id_siniestro: string }>(`/api/claims/manual`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 /**

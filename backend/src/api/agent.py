@@ -14,7 +14,9 @@ import sys
 from pathlib import Path
 
 # pyrefly: ignore [missing-import]
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
+from io import BytesIO
+from datetime import datetime
 
 # Ensure the backend root is on sys.path
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -67,3 +69,71 @@ def chat():
                 "Verifica que el dataset esté disponible y que GEMINI_API_KEY esté configurado."
             )
         }), 200
+
+
+@agent_bp.route("/export_pdf", methods=["POST"])
+def export_pdf():
+    """
+    Export a chat session to a PDF for audit purposes.
+
+    Body:
+      {
+        "title": "optional",
+        "messages": [{ "role": "user"|"agent", "text": "..." }]
+      }
+    """
+    body = request.get_json(silent=True) or {}
+    title = (body.get("title") or "Auditoria - Agente de Fraude").strip()
+    messages = body.get("messages") or []
+
+    try:
+        from fpdf import FPDF  # fpdf2
+
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=12)
+        pdf.add_page()
+
+        def _sanitize(text: str) -> str:
+            # Replace common Unicode punctuation with ASCII-safe equivalents
+            return (
+                text.replace("–", "-")
+                .replace("—", "-")
+                .replace("“", '"')
+                .replace("”", '"')
+                .replace("’", "'")
+            )
+
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.multi_cell(0, 8, _sanitize(title))
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(0, 6, _sanitize(f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M')}"))
+        pdf.ln(2)
+
+        for m in messages:
+            role = (m.get("role") or "").strip()
+            text = (m.get("text") or "").strip()
+            if not text:
+                continue
+
+            label = "Analista" if role == "user" else "Agente IA"
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.multi_cell(0, 6, _sanitize(f"{label}:"))
+            pdf.set_font("Helvetica", "", 10)
+            pdf.multi_cell(0, 5, _sanitize(text))
+            pdf.ln(2)
+
+        pdf_bytes = pdf.output(dest="S")
+        if isinstance(pdf_bytes, str):
+            pdf_bytes = pdf_bytes.encode("latin-1", errors="ignore")
+
+        buf = BytesIO(pdf_bytes)
+        buf.seek(0)
+        filename = "auditoria_agente.pdf"
+        return send_file(
+            buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=filename,
+        )
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500

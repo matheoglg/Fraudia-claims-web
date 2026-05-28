@@ -294,8 +294,15 @@ export default function ClaimAnalyzer() {
 
   const { claim, loading, error } = useClaim(idParam);
 
+  // Normalize scores: if backend sends values in 0-1, scale to 0-100
+  const rawFinal = claim?.final_score ?? 0;
+  const rawSoft = claim?.soft_score ?? 0;
+  const rawHard = claim?.hard_score ?? 0;
+  const score = rawFinal <= 1 ? rawFinal * 100 : rawFinal;
+  const softScore = rawSoft <= 1 ? rawSoft * 100 : rawSoft;
+  const hardScore = rawHard <= 1 ? rawHard * 100 : rawHard;
+
   const rc = claim ? riskColor(claim.final_color) : riskColor(undefined);
-  const score = claim?.final_score ?? 0;
   const softAlerts = claim?.soft_alerts ?? [];
   const hardAlerts = claim?.hard_alerts ?? [];
   const allAlerts = [...hardAlerts, ...softAlerts];
@@ -406,9 +413,9 @@ export default function ClaimAnalyzer() {
               {loading ? <SkeletonBlock h="h-8" w="w-24" /> : (
                 <>
                   <div className="flex items-center gap-4">
-                    <span className="font-display text-headline-lg text-primary">{(claim?.soft_score ?? 0).toFixed(0)}%</span>
+                    <span className="font-display text-headline-lg text-primary">{softScore.toFixed(0)}%</span>
                     <div className="flex-1 bg-surface-container-highest h-2 rounded-full overflow-hidden">
-                      <div className="bg-primary h-full transition-all duration-700" style={{ width: `${claim?.soft_score ?? 0}%` }} />
+                      <div className="bg-primary h-full transition-all duration-700" style={{ width: `${softScore}%` }} />
                     </div>
                   </div>
                   <p className="mt-4 font-body-md text-on-surface-variant">
@@ -429,9 +436,9 @@ export default function ClaimAnalyzer() {
               {loading ? <SkeletonBlock h="h-8" w="w-24" /> : (
                 <>
                   <div className="flex items-center gap-4">
-                    <span className="font-display text-headline-lg text-primary">{(claim?.hard_score ?? 0).toFixed(0)}%</span>
+                    <span className="font-display text-headline-lg text-primary">{hardScore.toFixed(0)}%</span>
                     <div className="flex-1 bg-surface-container-highest h-2 rounded-full overflow-hidden">
-                      <div className="bg-primary h-full transition-all duration-700" style={{ width: `${claim?.hard_score ?? 0}%` }} />
+                      <div className="bg-primary h-full transition-all duration-700" style={{ width: `${hardScore}%` }} />
                     </div>
                   </div>
                   <p className="mt-4 font-body-md text-on-surface-variant">

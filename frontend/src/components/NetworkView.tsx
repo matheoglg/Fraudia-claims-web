@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, ZoomIn, ZoomOut, Filter, Share2, Eye, Plus, Loader2, AlertCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchNetworkGraph, type NetworkNode, type NetworkEdge } from '../services/api';
 
 // ── Simple Physics Simulation Types ──────
@@ -13,6 +13,8 @@ interface SimNode extends NetworkNode {
 
 export default function NetworkView() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const focusId = (params.get('focus') || '').trim();
   const [data, setData] = useState<{ nodes: NetworkNode[]; edges: NetworkEdge[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +81,27 @@ export default function NetworkView() {
     loadData();
   }, []);
 
+  // Focus node (from Entities -> Network deep link)
+  useEffect(() => {
+    if (!focusId) return;
+    if (!containerRef.current) return;
+    if (simNodes.length === 0) return;
+
+    const node = simNodes.find((n) => n.id === focusId);
+    if (!node) return;
+
+    setSelectedNode(node);
+    // Pan to node
+    const width = containerRef.current?.clientWidth || window.innerWidth;
+    const height = containerRef.current?.clientHeight || window.innerHeight;
+    setZoom(1);
+    setPan({
+      x: width / 2 - node.x,
+      y: height / 2 - node.y,
+    });
+    alphaRef.current = 1.0;
+  }, [focusId, simNodes]);
+
   // Reheat simulation on filters or search change
   useEffect(() => {
     alphaRef.current = 1.0;
@@ -106,10 +129,12 @@ export default function NetworkView() {
       const dragId = draggingNodeRef.current;
 
       // Force Constants
-      const kRepulsion = 450; // Repelling force between all nodes
-      const kAttraction = 0.06; // Pull force along edges
-      const kGravity = 0.025; // Gravity pulling nodes to center
-      const damping = 0.8; // Friction
+      // Tuned to keep clusters separated and avoid collapsing into a single point.
+      const kRepulsion = 950; // Repelling force between all nodes
+      const kAttraction = 0.03; // Pull force along edges (springs)
+      const kGravity = 0.006; // Gentle gravity (avoid central collapse)
+      const damping = 0.85; // Friction
+      const minDist = 110; // Collision / separation radius
 
       // Calculate Repulsion Forces
       for (let i = 0; i < nodes.length; i++) {
@@ -121,15 +146,24 @@ export default function NetworkView() {
           const distSq = dx * dx + dy * dy + 0.1;
           const dist = Math.sqrt(distSq);
 
-          if (dist < 250) {
-            const force = (kRepulsion / distSq) * alphaRef.current;
-            const fx = (dx / dist) * force;
-            const fy = (dy / dist) * force;
+          // Base repulsion
+          const rep = (kRepulsion / distSq) * alphaRef.current;
+          const fx = (dx / dist) * rep;
+          const fy = (dy / dist) * rep;
+          u.vx += fx;
+          u.vy += fy;
+          v.vx -= fx;
+          v.vy -= fy;
 
-            u.vx += fx;
-            u.vy += fy;
-            v.vx -= fx;
-            v.vy -= fy;
+          // Extra collision push if too close
+          if (dist < minDist) {
+            const push = ((minDist - dist) / minDist) * 18 * alphaRef.current;
+            const cfx = (dx / dist) * push;
+            const cfy = (dy / dist) * push;
+            u.vx += cfx;
+            u.vy += cfy;
+            v.vx -= cfx;
+            v.vy -= cfy;
           }
         }
       }
@@ -164,6 +198,11 @@ export default function NetworkView() {
 
         // Apply damping and update positions if not being dragged
         if (node.id !== dragId) {
+          // Cap speed to avoid numerical collapse / oscillation
+          const maxV = 40;
+          node.vx = Math.max(-maxV, Math.min(maxV, node.vx));
+          node.vy = Math.max(-maxV, Math.min(maxV, node.vy));
+
           node.x += node.vx;
           node.y += node.vy;
           node.vx *= damping;

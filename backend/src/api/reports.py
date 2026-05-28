@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 # pyrefly: ignore [missing-import]
 from flask import Blueprint, jsonify
+import sqlite3
 
 # Ensure the backend root is on sys.path so relative imports work
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -11,6 +12,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from src.ingestion.load_data import load_siniestros
 from src.rules.fraud_rules import evaluate_record
+from src.storage.relational_db import DEFAULT_DB_PATH, ensure_relational_db
 
 reports_bp = Blueprint("reports", __name__, url_prefix="/api/reports")
 
@@ -23,7 +25,20 @@ def _sanitize(val):
 def get_report_stats():
     """Returns analytics based on real claims data."""
     try:
-        df_claims_raw = load_siniestros(processed=True)
+        # Prefer relational DB view for consistency with dashboard/manual claims
+        df_claims_raw = pd.DataFrame()
+        try:
+            ensure_relational_db(DEFAULT_DB_PATH)
+            conn = sqlite3.connect(DEFAULT_DB_PATH)
+            try:
+                df_claims_raw = pd.read_sql_query("SELECT * FROM claims_enriched", conn)
+            finally:
+                conn.close()
+        except Exception:
+            df_claims_raw = pd.DataFrame()
+
+        if df_claims_raw.empty:
+            df_claims_raw = load_siniestros(processed=True)
         if df_claims_raw.empty:
             return jsonify({
                 "ahorro_potencial": 0,

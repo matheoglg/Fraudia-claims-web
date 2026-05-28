@@ -10,6 +10,7 @@ import os
 import re
 import pandas as pd
 import numpy as np
+import sqlite3
 from pathlib import Path
 from typing import Dict, Any, List
 from dotenv import load_dotenv
@@ -45,15 +46,51 @@ class ClaimsAgent:
         self.df_aseg = pd.read_csv(asegurados_path) if asegurados_path.exists() else pd.DataFrame()
         self.df_prov = pd.read_csv(proveedores_path) if proveedores_path.exists() else pd.DataFrame()
         self.df_docs = pd.read_csv(documentos_path) if documentos_path.exists() else pd.DataFrame()
+
+        # Prefer relational view if available (enables richer joins for the IA)
+        try:
+            from src.storage.relational_db import DEFAULT_DB_PATH, ensure_relational_db  # noqa: PLC0415
+
+            ensure_relational_db(DEFAULT_DB_PATH)
+            conn = sqlite3.connect(DEFAULT_DB_PATH)
+            try:
+                self.df_rel = pd.read_sql_query("SELECT * FROM claims_enriched", conn)
+            finally:
+                conn.close()
+
+            # Use enriched view for analytics + retrieval when present
+            if not self.df_rel.empty:
+                self.df_sin = self.df_rel
+        except Exception:
+            self.df_rel = pd.DataFrame()
         
         # Initialize text vectorizer for semantic queries
         self.vectorizer = TfidfVectorizer()
         if "descripcion" in self.df_sin.columns:
             self.tfidf_matrix = self.vectorizer.fit_transform(self.df_sin["descripcion"].astype(str).tolist())
             
+        # Ensure scoring columns exist in the working dataframe too (not only in the summary copy)
+        self._ensure_scores_inplace()
+
         # Compile static summary stats to pass to Gemini
         self.dataset_summary = self._generate_dataset_summary()
         
+    def _ensure_scores_inplace(self) -> None:
+        """Guarantee final_score/final_color exist on self.df_sin for retrieval flows."""
+        if self.df_sin.empty:
+            return
+        if "final_score" in self.df_sin.columns and "final_color" in self.df_sin.columns:
+            return
+
+        # Prefer simulated label if present, otherwise default to 0 (verde)
+        if "etiqueta_fraude_simulada" in self.df_sin.columns:
+            self.df_sin["final_score"] = pd.to_numeric(self.df_sin["etiqueta_fraude_simulada"], errors="coerce").fillna(0) * 85
+        else:
+            self.df_sin["final_score"] = 0
+        self.df_sin["final_color"] = self.df_sin["final_score"].apply(
+            lambda s: "rojo" if s > 75 else ("amarillo" if s > 40 else "verde")
+        )
+
     def _generate_dataset_summary(self) -> str:
         """Pre-compute statistics and formats them in Markdown for Gemini's context."""
         df = self.df_sin.copy()
@@ -66,7 +103,10 @@ class ClaimsAgent:
         # Ensure final_score exists
         if "final_score" not in df.columns:
             # Fallback if features are raw
-            df["final_score"] = df["etiqueta_fraude_simulada"] * 85
+            if "etiqueta_fraude_simulada" in df.columns:
+                df["final_score"] = df["etiqueta_fraude_simulada"] * 85
+            else:
+                df["final_score"] = 0
             df["final_color"] = df["final_score"].apply(lambda s: "rojo" if s > 75 else ("amarillo" if s > 40 else "verde"))
             
         red_count = (df["final_color"] == "rojo").sum()

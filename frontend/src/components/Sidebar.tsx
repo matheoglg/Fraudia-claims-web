@@ -85,7 +85,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         <a 
           className={`flex items-center gap-3 py-2 rounded-lg text-on-secondary-fixed-variant hover:bg-surface-container-high transition-colors font-label-md ${isOpen ? 'px-3' : 'justify-center'}`} 
           href="#"
-          title="Settings"
+          title="A implementar próximamente"
+          onClick={(e) => e.preventDefault()}
         >
           <span className="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
           {isOpen && <span>Settings</span>}
@@ -93,7 +94,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         <a 
           className={`flex items-center gap-3 py-2 rounded-lg text-on-secondary-fixed-variant hover:bg-surface-container-high transition-colors font-label-md ${isOpen ? 'px-3' : 'justify-center'}`} 
           href="#"
-          title="Help"
+          title="A implementar próximamente"
+          onClick={(e) => e.preventDefault()}
         >
           <span className="material-symbols-outlined text-[20px]" data-icon="help">help</span>
           {isOpen && <span>Help</span>}

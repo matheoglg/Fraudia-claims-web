@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, FileText, TrendingUp, Paperclip, ArrowUp, User, Sparkles, TriangleAlert, Clock, Plus, Trash2, X } from 'lucide-react';
-import { chatWithAgent } from '../services/api';
+import { Search, FileText, TrendingUp, Paperclip, ArrowUp, User, Sparkles, TriangleAlert, Clock, Plus, Trash2, X, Download } from 'lucide-react';
+import { chatWithAgent, exportAgentPdf } from '../services/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -213,6 +213,30 @@ export default function AgentView() {
     }
   };
 
+  const exportPdf = async () => {
+    const session = sessions.find((s) => s.id === activeSessionId);
+    if (!session || session.messages.length === 0) {
+      alert('No hay mensajes para exportar.');
+      return;
+    }
+    try {
+      const blob = await exportAgentPdf({
+        title: `Auditoría – ${session.title}`,
+        messages: session.messages.map((m) => ({ role: m.role, text: m.text })),
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `auditoria_agente_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert(`No se pudo exportar PDF: ${e.message ?? e}`);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -349,6 +373,14 @@ export default function AgentView() {
                       {sessions.length}
                     </span>
                   )}
+                </button>
+                <button
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors text-label-md font-medium"
+                  onClick={exportPdf}
+                  title="Exportar auditoría PDF"
+                  disabled={!activeSessionId || messages.length === 0}
+                >
+                  <Download size={16} /> Exportar PDF
                 </button>
               </div>
               <button
