@@ -1,25 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig(({ command }) => {
+  // Reemplaza esto con la URL real que te dio Render para tu backend
+  const RENDER_BACKEND_URL = 'https://fraudia-math.onrender.com'; 
+
   return {
     plugins: [react()],
     server: {
-      // El proxy SOLO se activará en tu máquina local ('pnpm run dev')
-      // En Render (producción) se quedará vacío {} para no interferir con las rutas relativas
-      proxy: command === 'serve' ? {
+      // En local usa el puerto 5000, en producción redirige con una regla limpia
+      proxy: {
         '/api': {
-          target: 'http://127.0.0.1:5000',
+          target: command === 'serve' ? 'http://127.0.0.1:5000' : RENDER_BACKEND_URL,
           changeOrigin: true,
           secure: false,
         },
-      } : {},
+      },
     },
   }
 })
-
-
-// Trigger restart
-
-// Hard restart
