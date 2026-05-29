@@ -36,7 +36,8 @@ def create_app() -> Flask:
     app = Flask(__name__, static_folder=static_folder, static_url_path="/")
 
     # Allow the React dev server (default port 5173) and any localhost origin
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+    #CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     # Register blueprints
     app.register_blueprint(health_bp)
